@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#111827">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Exam HQ">
+<link rel="manifest" href="manifest.json">
 <title>Exam HQ</title>
 <style>
 :root{color-scheme:dark;--bg:#0b1020;--panel:#141c2f;--panel2:#1b2640;--text:#f3f6ff;--muted:#9ba8c2;--accent:#8b9cff;--green:#7ee0b1;--line:#2b3855}
@@ -45,7 +48,17 @@ nav{display:flex;gap:7px;overflow:auto;padding:4px 0 15px}nav button{white-space
 <div class="miniq" style="margin-top:12px"><h3 style="margin-top:0">Choose your quest</h3><p class="muted small">Select one or several subjects, or focus on general exam technique. Questions will be drawn only from your selection.</p><div id="subjectChoices" class="formgrid"></div><label style="margin-top:12px">Question mix<select id="questionMode"><option value="mixed">Mixed: knowledge + exam technique</option><option value="knowledge">Subject knowledge only</option><option value="technique">General exam technique only</option></select></label><label style="margin-top:12px">Difficulty<select id="difficulty"><option value="standard">Standard</option><option value="challenge">Challenge</option></select></label></div><div class="progressbar"><span id="questProgress"></span></div><div id="questIntro" class="small">Answer five questions. Your streak increases when you finish at least one quest per calendar day.</div><button id="startQuest" class="primary" style="width:100%;margin-top:14px">Start today's quest</button><div id="quizArea"></div></section></main>
 <main id="settings" class="hidden"><section class="card"><div class="label">Add a future exam</div><p class="muted small">Use this for February mocks, GCSEs, or later exams.</p><form id="examForm"><label>Subject / paper<input id="examTitle" required placeholder="e.g. Biology Paper 2"></label><div class="formgrid"><label>Date<input id="examDate" type="date" required></label><label>Start time<input id="examTime" type="time" required value="08:45"></label></div><div class="formgrid"><label>Duration<select id="examDuration"><option value="45">45 minutes</option><option value="60">1 hour</option><option value="75">1 hour 15</option><option value="90">1 hour 30</option><option value="105" selected>1 hour 45</option><option value="120">2 hours</option><option value="135">2 hours 15</option></select></label><label>Exam series<input id="examSeries" placeholder="e.g. GCSE 2027"></label></div><button class="primary" style="width:100%;margin-top:14px">Save exam</button></form></section>
 <section class="card"><div class="label">Import / export</div><p class="hint">Export your exam list as a backup, or import a previously exported Exam HQ JSON file.</p><div class="row" style="flex-wrap:wrap"><button class="secondary" id="exportBtn">Export exams</button><label class="secondary" style="margin:0;cursor:pointer">Import exams<input id="importFile" type="file" accept=".json,application/json" hidden></label></div><p class="hint" style="margin-top:14px">Data is saved in this browser on this device. Back it up before clearing website data or changing phones.</p></section>
-<section class="card"><div class="label">Notifications on iPhone</div><p class="hint">This prototype does not send reliable background push notifications by itself. For dependable alerts, add exams to Apple Calendar with alerts, or host this as an installed web app with HTTPS and configure web push. The calendar import file is the easiest next step.</p></section></main>
+<section class="card"><div class="label">Genuine iPhone push notifications</div>
+<p class="hint">Set up the push service once, then enable notifications from this Home Screen app. Your reminders are scheduled by the service even when Exam HQ is closed. Keep your Worker URL and access token private.</p>
+<label>Push Worker URL<input id="pushApiUrl" type="url" placeholder="https://your-worker.your-subdomain.workers.dev"></label>
+<label>Private setup token<input id="pushToken" type="password" autocomplete="off" placeholder="Your Cloudflare Worker PUSH_ADMIN_TOKEN"></label>
+<div class="formgrid"><label style="display:flex;align-items:center;gap:8px"><input id="dailyPushEnabled" type="checkbox" checked style="width:auto;margin:0">Daily reminder</label><label>Daily time<input id="dailyPushTime" type="time" value="17:00"></label></div>
+<label style="display:flex;align-items:center;gap:8px"><input id="examPushEnabled" type="checkbox" checked style="width:auto;margin:0">Exam reminders (day before at 17:00 and exam day at 07:00)</label>
+<button class="primary" id="enablePushBtn" style="width:100%;margin-top:14px">Enable notifications on this iPhone</button>
+<div class="formgrid" style="margin-top:9px"><button class="secondary" id="testPushBtn" disabled>Send test notification</button><button class="secondary" id="syncPushBtn" disabled>Sync exam list</button></div>
+<button class="secondary" id="disablePushBtn" style="width:100%;margin-top:9px">Disable notifications</button>
+<p id="pushStatus" class="hint" role="status" aria-live="polite">Notifications are not configured yet.</p>
+<p class="hint">Your exam/task/card/XP data remains in this browser. Exam dates are copied to the push service only to schedule your reminders. This setup uses Cloudflare Worker + KV and web push; it does not require a paid Apple Developer account.</p></section></main>
 <footer>Exam HQ · Personal planner · Your data stays in this browser</footer>
 <script>
 const initial=[
@@ -167,6 +180,45 @@ document.getElementById("examForm").addEventListener("submit",e=>{e.preventDefau
 document.getElementById("taskForm").addEventListener("submit",e=>{e.preventDefault();tasks.push({title:document.getElementById("taskTitle").value.trim(),date:document.getElementById("taskDate").value,duration:document.getElementById("taskDuration").value,done:false});e.target.reset();render()});
 document.getElementById("exportBtn").onclick=()=>{let blob=new Blob([JSON.stringify({exams,tasks,cards,questData},null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="exam-hq-backup.json";a.click();URL.revokeObjectURL(a.href)};
 document.getElementById("importFile").onchange=async e=>{let f=e.target.files[0];if(!f)return;try{let d=JSON.parse(await f.text());if(Array.isArray(d.exams))exams=d.exams;if(Array.isArray(d.tasks))tasks=d.tasks;if(Array.isArray(d.cards))cards=d.cards;if(d.questData)questData=d.questData;render();alert("Import complete.")}catch(err){alert("That file could not be imported.")}};
-document.getElementById("taskDate").value=localDate();renderSubjectChoices();render();
+
+document.getElementById("taskDate").value=localDate();render();
+
+// Push notifications: the service worker and Cloudflare Worker are separate files.
+const PUSH_CFG_KEY="examhq_push_config", PUSH_ENABLED_KEY="examhq_push_enabled";
+let pushSyncTimer=null;
+function getPushConfig(){try{return JSON.parse(localStorage.getItem(PUSH_CFG_KEY)||"{}")}catch(e){return {}}}
+function setPushStatus(message){const el=document.getElementById("pushStatus");if(el)el.textContent=message}
+function pushApi(){const c=getPushConfig();return (c.api||"").trim().replace(/\/$/,"")}
+function pushHeaders(){const c=getPushConfig();return {"Content-Type":"application/json","Authorization":"Bearer "+(c.token||"")}}
+function pushPrefs(){return {dailyEnabled:document.getElementById("dailyPushEnabled").checked,dailyTime:document.getElementById("dailyPushTime").value||"17:00",examEnabled:document.getElementById("examPushEnabled").checked,timezone:"Europe/London"}}
+function updatePushButtons(){const configured=!!(pushApi()&&getPushConfig().token&&localStorage.getItem(PUSH_ENABLED_KEY)==="1");document.getElementById("testPushBtn").disabled=!configured;document.getElementById("syncPushBtn").disabled=!configured}
+function savePushInputs(){localStorage.setItem(PUSH_CFG_KEY,JSON.stringify({api:document.getElementById("pushApiUrl").value.trim(),token:document.getElementById("pushToken").value.trim()}));updatePushButtons()}
+async function postPush(path,body){const api=pushApi();if(!api)throw new Error("Enter your Push Worker URL first.");const r=await fetch(api+path,{method:"POST",headers:pushHeaders(),body:JSON.stringify(body)});let d={};try{d=await r.json()}catch(e){}if(!r.ok)throw new Error(d.error||("Push service returned "+r.status));return d}
+async function syncPushData(showMessage=true){if(localStorage.getItem(PUSH_ENABLED_KEY)!=="1")return;const c=getPushConfig();if(!c.api||!c.token)return;try{const reg=await navigator.serviceWorker.getRegistration("./");if(!reg)throw new Error("Service worker is not registered. Enable notifications again from the Home Screen app.");const sub=await reg.pushManager.getSubscription();if(!sub)throw new Error("No push subscription found. Tap Enable notifications again.");await postPush("/sync",{subscription:sub.toJSON(),exams:exams.map(e=>({title:e.title,date:e.date,time:e.time||"08:45",done:!!e.done})),preferences:pushPrefs()});if(showMessage)setPushStatus("Exam list and reminder preferences synced successfully.")}catch(err){if(showMessage)setPushStatus("Sync failed: "+err.message)}}
+function queuePushSync(){if(localStorage.getItem(PUSH_ENABLED_KEY)!=="1")return;clearTimeout(pushSyncTimer);pushSyncTimer=setTimeout(()=>syncPushData(false),1800)}
+const originalSave=save;
+save=function(){originalSave();queuePushSync()};
+(function loadPushInputs(){const c=getPushConfig();document.getElementById("pushApiUrl").value=c.api||"";document.getElementById("pushToken").value=c.token||"";try{const p=JSON.parse(localStorage.getItem("examhq_push_prefs")||"null");if(p){document.getElementById("dailyPushEnabled").checked=p.dailyEnabled!==false;document.getElementById("dailyPushTime").value=p.dailyTime||"17:00";document.getElementById("examPushEnabled").checked=p.examEnabled!==false}}catch(e){}updatePushButtons()})();
+["dailyPushEnabled","dailyPushTime","examPushEnabled"].forEach(id=>document.getElementById(id).addEventListener("change",()=>{localStorage.setItem("examhq_push_prefs",JSON.stringify(pushPrefs()));queuePushSync()}));
+document.getElementById("pushApiUrl").addEventListener("change",savePushInputs);document.getElementById("pushToken").addEventListener("change",savePushInputs);
+document.getElementById("enablePushBtn").addEventListener("click",async()=>{
+ try{
+  savePushInputs();const api=pushApi(),cfg=getPushConfig();if(!api||!cfg.token)throw new Error("Enter the Worker URL and private setup token from your setup guide first.");
+  if(!window.isSecureContext||!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window))throw new Error("Web Push is not available here. Open Exam HQ from its Home Screen icon on a supported iPhone/iOS version.");
+  if(Notification.permission==="denied")throw new Error("Notifications are blocked in iPhone Settings. Enable them for Exam HQ there, then try again.");
+  setPushStatus("Registering the notification service…");
+  const reg=await navigator.serviceWorker.register("./sw.js",{scope:"./"});await navigator.serviceWorker.ready;
+  const cr=await fetch(api+"/config");if(!cr.ok)throw new Error("Could not read push-service configuration. Check the Worker URL.");const publicCfg=await cr.json();if(!publicCfg.publicKey)throw new Error("The push service has no VAPID public key configured yet.");
+  let sub=await reg.pushManager.getSubscription();if(!sub){const permission=await Notification.requestPermission();if(permission!=="granted")throw new Error("Notification permission was not granted.");sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(publicCfg.publicKey)})}
+  localStorage.setItem(PUSH_ENABLED_KEY,"1");localStorage.setItem("examhq_push_prefs",JSON.stringify(pushPrefs()));
+  await postPush("/subscribe",{subscription:sub.toJSON(),exams:exams.map(e=>({title:e.title,date:e.date,time:e.time||"08:45",done:!!e.done})),preferences:pushPrefs()});updatePushButtons();setPushStatus("Notifications enabled. Daily reminder: "+pushPrefs().dailyTime+"; exam reminders: "+(pushPrefs().examEnabled?"on":"off")+". Sending a test now…");
+  await postPush("/test",{});setPushStatus("Notifications enabled and test sent. Check your iPhone Notification Centre. Keep this Home Screen app installed.");
+ }catch(err){setPushStatus("Could not enable notifications: "+err.message)}
+});
+document.getElementById("testPushBtn").addEventListener("click",async()=>{try{await postPush("/test",{});setPushStatus("Test notification sent. Check Notification Centre.")}catch(e){setPushStatus("Test failed: "+e.message)}});
+document.getElementById("syncPushBtn").addEventListener("click",()=>syncPushData(true));
+document.getElementById("disablePushBtn").addEventListener("click",async()=>{try{const reg=await navigator.serviceWorker.getRegistration("./");const sub=reg&&await reg.pushManager.getSubscription();if(sub){try{await postPush("/unsubscribe",{endpoint:sub.endpoint})}catch(e){}await sub.unsubscribe()}localStorage.removeItem(PUSH_ENABLED_KEY);updatePushButtons();setPushStatus("Push notifications disabled on this device. Your revision data is unchanged.")}catch(e){setPushStatus("Could not disable notifications: "+e.message)}});
+function urlBase64ToUint8Array(base64String){const padding="=".repeat((4-base64String.length%4)%4);const base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");const raw=atob(base64);return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)))}
+
 </script>
 </body></html>

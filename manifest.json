@@ -1,0 +1,12 @@
+{
+  "id": "/exam-hq/",
+  "name": "Exam HQ",
+  "short_name": "Exam HQ",
+  "description": "Personal GCSE exam planner and revision tracker",
+  "start_url": "/exam-hq/",
+  "scope": "/exam-hq/",
+  "display": "standalone",
+  "background_color": "#0b1020",
+  "theme_color": "#111827",
+  "orientation": "portrait"
+}
