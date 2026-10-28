@@ -140,8 +140,8 @@ function renderCards(){
  const review=document.getElementById("reviewCard"),list=document.getElementById("cardList");if(!review||!list)return;
  const due=cards.filter(c=>c.box===1||!c.nextReview||c.nextReview<=localDate());
  if(due.length){const c=due[0];review.style.display="block";review.innerHTML=`<div class="label">${esc(c.subject)} · BOX ${c.box||1}</div><h3 style="margin:9px 0">${esc(c.front)}</h3><div id="cardAnswer" class="hidden" style="white-space:pre-wrap;background:#18223a;border-radius:10px;padding:12px;margin-top:10px">${esc(c.back)}</div><button class="primary" id="revealCard" style="width:100%;margin-top:12px">Reveal answer</button><div id="cardRating" class="row hidden" style="margin-top:10px"><button class="secondary" onclick="rateCard('${c.id}',false)">Forgot it ↺</button><button class="primary" onclick="rateCard('${c.id}',true)">Got it ✓</button></div>`;document.getElementById("revealCard").onclick=()=>{document.getElementById("cardAnswer").classList.remove("hidden");document.getElementById("cardRating").classList.remove("hidden");document.getElementById("revealCard").classList.add("hidden")};}
- else {review.style.display="block";review.innerHTML='<div class="empty">No cards due right now. Add a card or come back when your next review is due.</div>'}
- list.innerHTML=cards.length?cards.map(c=>`<div class="exam"><div class="examinfo"><b>${esc(c.subject)} · Box ${c.box||1}</b><div class="muted small">${esc(c.front)}</div></div><button class="iconbtn" aria-label="Delete card" onclick="deleteCard('${c.id}')">×</button></div>`).join(""):'<div class="empty">Your cards will appear here.</div>';
+ else {review.style.display="block";review.innerHTML='<div class="empty">No flashcards due right now. Add cards or come back when they are due.</div>'}
+ list.innerHTML=cards.length?cards.map(c=>`<div class="exam"><div class="examinfo"><b>${esc(c.subject)} · Box ${c.box||1}</b><div class="muted small">${esc(c.front)}</div></div><button class="iconbtn" aria-label="Delete card" onclick="deleteCard('${c.id}')">×</button></div>`).join(""):'<div class="empty">No flashcards yet.</div>';
 }
 function rateCard(id,correct){const c=cards.find(x=>x.id===id);if(!c)return;if(correct){c.box=Math.min(5,(c.box||1)+1)}else{c.box=1}const gaps=[1,2,4,7,14];c.nextReview=new Date(Date.now()+gaps[(c.box||1)-1]*86400000).getFullYear()+"-"+String(new Date(Date.now()+gaps[(c.box||1)-1]*86400000).getMonth()+1).padStart(2,"0")+"-"+String(new Date(Date.now()+gaps[(c.box||1)-1]*86400000).getDate()).padStart(2,"0");save();renderBoxes();renderCards();renderSmartTip(sorted().find(e=>!e.done&&dt(e)>=new Date()));}
 function deleteCard(id){cards=cards.filter(c=>c.id!==id);save();renderBoxes();renderCards()}
@@ -181,7 +181,7 @@ document.getElementById("taskForm").addEventListener("submit",e=>{e.preventDefau
 document.getElementById("exportBtn").onclick=()=>{let blob=new Blob([JSON.stringify({exams,tasks,cards,questData},null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="exam-hq-backup.json";a.click();URL.revokeObjectURL(a.href)};
 document.getElementById("importFile").onchange=async e=>{let f=e.target.files[0];if(!f)return;try{let d=JSON.parse(await f.text());if(Array.isArray(d.exams))exams=d.exams;if(Array.isArray(d.tasks))tasks=d.tasks;if(Array.isArray(d.cards))cards=d.cards;if(d.questData)questData=d.questData;render();alert("Import complete.")}catch(err){alert("That file could not be imported.")}};
 
-document.getElementById("taskDate").value=localDate();render();
+document.getElementById("taskDate").value=localDate();renderSubjectChoices();render();
 
 // Push notifications: the service worker and Cloudflare Worker are separate files.
 const PUSH_CFG_KEY="examhq_push_config", PUSH_ENABLED_KEY="examhq_push_enabled";
